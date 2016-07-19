@@ -1,11 +1,9 @@
-import email, getpass, imaplib, os
+import email, getpass, imaplib
 
-detach_dir = '.' # directory where to save attachments (default: current)
-
-# connecting to the gmail imap server
 m = imaplib.IMAP4_SSL("imap.gmail.com")
 mailid = 'sahil.agarwal@craftsvilla.com'
-m.login(mailid, getpass.getpass())
+password = getpass.getpass()
+m.login(mailid, password)
 m.select("INBOX") # If using other mailbox for SQL, please enter it here.
 
 
@@ -17,24 +15,26 @@ def get_attachment_text():
         resp, data = m.fetch(emailid, "(RFC822)")
         mail = email.message_from_string(data[0][1]) # parsing the mail content to get a mail object
 
-        #Check if any attachments at all. If not, we skip to next email.
+        # If no attachments, skip to next email.
         if mail.get_content_maintype() != 'multipart':
             continue
 
         print "[" + mail["From"] + "] :" + mail["Subject"]
+        read_message(mail)
 
-        for part in mail.walk():
-            # multipart are just containers, so skip.
-            if part.get_content_maintype() == 'multipart':
-                continue
+def read_message(mail):
+    for part in mail.walk():
+        # multipart are just containers, so skip.
+        if part.get_content_maintype() == 'multipart':
+            continue
 
-            # is no attachment, skip.
-            if part.get('Content-Disposition') is None:
-                continue
+        # is no attachment, skip.
+        if part.get('Content-Disposition') is None:
+            continue
 
-            received_csv_query = part.get_payload(decode=True)
-            make_reply_csv(received_csv_query) #make it return the file
-            send_reply_csv(mail["From"], mail["Subject"]) #Will also have whatever returned from make_reply_csv
+        received_csv_query = part.get_payload(decode=True)
+        reply_file = make_reply_csv(received_csv_query) #make it return the csv file
+        send_reply_csv(reply_file, mail) #Will also have whatever returned from make_reply_csv
 
 def make_reply_csv():
     pass
@@ -49,13 +49,12 @@ from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
 
-def send_reply_csv():
-    fileToSend = "hi.csv"
+def send_reply_csv(fileToSend, mail):
     msg = MIMEMultipart()
-    msg["From"] = emailfrom
-    msg["To"] = emailto
-    msg["Subject"] = "help I cannot send an attachment to save my life"
-    msg.preamble = "help I cannot send an attachment to save my life"
+    msg["From"] = mailid
+    msg["To"] = mail["From"]
+    msg["Subject"] = 'Re: ' + mail["Subject"]
+    msg.preamble = 'Re: ' + mail["Subject"]
 
     ctype, encoding = mimetypes.guess_type(fileToSend)
     if ctype is None or encoding is not None:
@@ -87,11 +86,11 @@ def send_reply_csv():
 
     server = smtplib.SMTP("smtp.gmail.com:587")
     server.starttls()
-    server.login(username,password)
-    server.sendmail(emailfrom, emailto, msg.as_string())
+    server.login(mailid,password)
+    server.sendmail(mailid, mail["From"], msg.as_string())
 
 
-'''
+'''SEARCH parameters - 
 http://www.example-code.com/csharp/imap-search-critera.asp 
 https://tools.ietf.org/html/rfc3501#section-6.4.4 
 http://stackoverflow.com/questions/12944727/python-imaplib-view-message-to-specific-sender

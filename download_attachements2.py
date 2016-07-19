@@ -1,11 +1,9 @@
-import email, getpass, imaplib, os
+import email, getpass, imaplib
 
-detach_dir = '.' # directory where to save attachments (default: current)
-
-# connecting to the gmail imap server
 m = imaplib.IMAP4_SSL("imap.gmail.com")
 mailid = 'sahil.agarwal@craftsvilla.com'
-m.login(mailid, getpass.getpass())
+password = getpass.getpass()
+m.login(mailid, password)
 m.select("INBOX") # If using other mailbox for SQL, please enter it here.
 
 
@@ -17,21 +15,30 @@ def get_attachment_text():
         resp, data = m.fetch(emailid, "(RFC822)")
         mail = email.message_from_string(data[0][1]) # parsing the mail content to get a mail object
 
-        #Check if any attachments at all. If not, we skip to next email.
+        # If no attachments, skip to next email.
         if mail.get_content_maintype() != 'multipart':
             continue
 
         print "[" + mail["From"] + "] :" + mail["Subject"]
+        read_message(mail)
 
-        for part in mail.walk():
-            # multipart are just containers, so skip.
-            if part.get_content_maintype() == 'multipart':
-                continue
+def read_message(mail):
+    for part in mail.walk():
+        # multipart are just containers, so skip.
+        if part.get_content_maintype() == 'multipart':
+            continue
 
-            # is no attachment, skip.
-            if part.get('Content-Disposition') is None:
-                continue
+        # is no attachment, skip.
+        if part.get('Content-Disposition') is None:
+            continue
 
-            print part.get_payload(decode=True)
+        print part.get_payload(decode=True)
 
 get_attachment_text()
+
+
+'''SEARCH parameters - 
+http://www.example-code.com/csharp/imap-search-critera.asp 
+https://tools.ietf.org/html/rfc3501#section-6.4.4 
+http://stackoverflow.com/questions/12944727/python-imaplib-view-message-to-specific-sender
+'''
