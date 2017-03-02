@@ -1,5 +1,7 @@
+"""Local Configuration File"""
+
 IMAP_server_address = "imap.gmail.com"
-mail_id = 'sahil.agarwal@craftsvilla.com'
+mail_id = ''
 password = ''
 mailbox = 'INBOX'
 
