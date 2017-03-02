@@ -1,9 +1,11 @@
 import email
 import getpass
 import imaplib
+import config
 
 
 def initialise_mail():
+    '''Initialise the email client instance'''
     mail_client = imaplib.IMAP4_SSL(config.IMAP_server_address)
     mail_client.login(config.mail_id, config.password)
     mail_client.select(config.mailbox)
