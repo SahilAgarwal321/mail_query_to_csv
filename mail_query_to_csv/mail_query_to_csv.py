@@ -1,15 +1,12 @@
 import email
-import getpass
 import imaplib
+import config
 import smtplib
 import mimetypes
-import config
 from email.mime.multipart import MIMEMultipart
 from email import encoders
 from email.message import Message
-from email.mime.audio import MIMEAudio
 from email.mime.base import MIMEBase
-from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
 
 
@@ -49,58 +46,64 @@ def read_message(mail):
         print config.status_template
         # print "[" + mail["From"] + "] : " + mail["Subject"] + " : " + mail["Date"]
         received_csv_query = part.get_payload(decode=True)
-        get_reply_csv(received_csv_query)
-        '''send_reply_csv(reply_file, mail)
-        Will also have whatever returned from get_reply_csv'''
+        csv_file = get_reply_csv(received_csv_query)
+        send_reply_csv(csv_file, mail)
 
 
 def get_reply_csv(received_csv_query):
     '''Sends query to database and gets back data in a csv file. Format : \n
-    mysql -u username -ppassword -h host db_name -e "query" < any_csv_filename.csv
+    `mysql -u username -ppassword -h host db_name -e "query" < any_csv_filename.csv`
     '''
-    mysql -u config.db_username -ppassword -h config.db_host config.db_name -e received_csv_query < config.csv_filename
-    send_reply_csv(config.csv_filename, mail)
+    csv_filename = config.csv_filename
+    mysql -u config.db_username -ppassword -h config.db_host config.db_name -e received_csv_query < csv_filename
+    return csv_filename
 
 
-def send_reply_csv(csv_file, mail):
+def send_reply_csv(file, mail):
+    '''Sends a mail with csv "file" as reply to the recieved "mail" (which had the query)'''
     msg = MIMEMultipart()
-    msg["From"] = mailid
+    set_reply_msg_credentials(msg)
+    attach_file(msg, file)
+
+    server = smtplib.SMTP("smtp.gmail.com:587")
+    server.starttls()
+    server.login(config.mail_id, config.password)
+    server.sendmail(config.mail_id, mail["From"], msg.as_string())
+
+
+def set_reply_msg_credentials(msg):
+    '''Set the outgoing ie. reply mail credentials'''
+    msg["From"] = config.mail_id
     msg["To"] = mail["From"]
     msg["Subject"] = 'Re: ' + mail["Subject"]
     msg.preamble = 'Re: ' + mail["Subject"]
 
-    ctype, encoding = mimetypes.guess_type(csv_file)
-    if ctype is None or encoding is not None:
-        ctype = "application/octet-stream"
 
-    maintype, subtype = ctype.split("/", 1)
-
+def attach_file(msg, file):
+    '''Attach the file to the mail'''
+    maintype, subtype = get_file_type(file)
     if maintype == "text":
-        fp = open(csv_file)
-        # Note: we should handle calculating the charset
+        fp = open(file)
         attachment = MIMEText(fp.read(), _subtype=subtype)
         fp.close()
-    elif maintype == "image":
-        fp = open(csv_file, "rb")
-        attachment = MIMEImage(fp.read(), _subtype=subtype)
-        fp.close()
-    elif maintype == "audio":
-        fp = open(csv_file, "rb")
-        attachment = MIMEAudio(fp.read(), _subtype=subtype)
-        fp.close()
     else:
-        fp = open(csv_file, "rb")
+        fp = open(file, "rb")
         attachment = MIMEBase(maintype, subtype)
         attachment.set_payload(fp.read())
         fp.close()
         encoders.encode_base64(attachment)
-    attachment.add_header("Content-Disposition", "attachment", filename=csv_file)
+    attachment.add_header("Content-Disposition", "attachment", filename=file)
     msg.attach(attachment)
 
-    server = smtplib.SMTP("smtp.gmail.com:587")
-    server.starttls()
-    server.login(mailid, password)
-    server.sendmail(mailid, mail["From"], msg.as_string())
+
+def get_file_type(file):
+    """Determines the file type based on it's URL/extension"""
+    ctype, encoding = mimetypes.guess_type(file)
+    if ctype is None or encoding is not None:
+        ctype = "application/octet-stream"
+    maintype, subtype = ctype.split("/", 1)
+    return maintype, subtype
+
 
 if __name__ == '__main__':
     mail_client = initialise_mail()
